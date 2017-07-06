@@ -1,4 +1,5 @@
 from urllib import request
+from urllib import error
 from plotly import __version__
 from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
 from plotly.graph_objs import Scatter, Figure, Layout
@@ -27,29 +28,32 @@ def main(delay, SMOOTHING_FACTOR, buy_threshold, sell_threshold):
 		req_data_collected = False
 
 		while True:
-			nextPrice = float(json.loads(request.urlopen(req).read())["lprice"])
-			raw_points.append(nextPrice)
-			ewma = (nextPrice * SMOOTHING_FACTOR) + ((1-SMOOTHING_FACTOR) * ewma)
-			print(ewma)
-			time.sleep(delay)
-			points.append(ewma)
+			try:
+				nextPrice = float(json.loads(request.urlopen(req).read())["lprice"])
+				raw_points.append(nextPrice)
+				ewma = (nextPrice * SMOOTHING_FACTOR) + ((1-SMOOTHING_FACTOR) * ewma)
+				print(ewma)
+				time.sleep(delay)
+				points.append(ewma)
 
-			if time.time() - startTime > 3600:
-				with open('prices.csv','a') as f:
-					f.write(time.asctime()+","+str(ewma)+";\n")
-				req_data_collected = True
-				startTime = time.time()
+				if time.time() - startTime > 3600:
+					with open('prices.csv','a') as f:
+						f.write(time.asctime()+","+str(ewma)+";\n")
+					req_data_collected = True
+					startTime = time.time()
 
-			if req_data_collected:
-				if ewma-nextPrice > buy_threshold and coins == 0:
-					simulatedCash -= nextPrice						#Consolidate this into a method later
-					coins+=1
-					purchasePrice = nextPrice
-				elif coins == 1 and nextPrice - purchasePrice > sell_threshold:
-					simulatedCash += nextPrice
-					coins -= 1
-					with open('tradelog.csv','a') as f:
-						f.write(time.asctime()+","+str(nextPrice - purchasePrice)+";\n")
+				if req_data_collected:
+					if ewma-nextPrice > buy_threshold and coins == 0:
+						simulatedCash -= nextPrice						#Consolidate this into a method later
+						coins+=1
+						purchasePrice = nextPrice
+					elif coins == 1 and nextPrice - purchasePrice > sell_threshold:
+						simulatedCash += nextPrice
+						coins -= 1
+						with open('tradelog.csv','a') as f:
+							f.write(time.asctime()+","+str(nextPrice - purchasePrice)+";\n")
+			except error.URLError as e:
+				print(e)
 	except Exception as e:
 		print(e)
 		plot([Scatter(x=list(range(1,len(points))), y=points), Scatter(x=list(range(1,len(raw_points))), y=raw_points)])
